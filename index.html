@@ -186,6 +186,12 @@
       padding-top: 0.1em;
     }
 
+    .descr.prop {
+      width: 100%;
+      padding-top: 0.4em;
+      font-size: 0.8em;
+    }
+
     .sp.value {
       font-size: 0.9em;
     }
@@ -431,6 +437,12 @@
     return match && fixLinebreaks(match.groups['prop'])
   }
 
+  function parseSpecials(text) {
+    const regExp = new RegExp('[,;]\\s*(?:BES|SP)\\s+(?<prop>.+)\\s*[,;]\\s*(RW|SV)');
+    const match = text.match(regExp);
+    return match && fixLinebreaks(match.groups['prop'])
+  }
+
   function parseSaving(text, rwProp) {
     const regExp = new RegExp('[,;]\\s*(RW|SV)'
             + '\\s+(ZÄH|Fort)\\s+(?<zaeh>[^,;]+)\\s*[,;]'
@@ -491,14 +503,34 @@
       rw_ref: parseSaving(text, 'ref'),
       rw_wil: parseSaving(text, 'wil'),
       gesinnung: parseAlignment(text),
-      sp: unifyDiceRolls(parseGenericProp(text, ['BES','SP']))
+      sp: unifyDiceRolls(parseSpecials(text)),
+      descr: null
     };
     return monsterStat.name && monsterStat;
   }
 
   function parseMonsterStats(text) {
-    const parts = text.split(/\.\s*\n/);
-    return parts.filter(p => !!p.trim()).map(p => parseSingleMonsterStat(p + '.')).filter(ms => !!ms);
+    const parts = text.split(/\n/);
+    const monsterStats = [];
+    let i = -1;
+    let nextMaybeDescr = false;
+    for (const part of parts) {
+      if (part && part.trim() !== '') {
+        let ms = parseSingleMonsterStat(part.trim());
+        if (ms) {
+          monsterStats[++i] = ms;
+        } else if (nextMaybeDescr) {
+          if (!monsterStats[i].descr) {
+            monsterStats[i].descr = [];
+          }
+          monsterStats[i].descr.push(part);
+        }
+        nextMaybeDescr = true;
+      } else {
+        nextMaybeDescr = false;
+      }
+    }
+    return monsterStats;
   }
 
   function multiplyCards(monsterStats, settings) {
@@ -597,16 +629,25 @@
   function pasteSampleStats() {
     document.querySelector('#input-text').value =
 '... THE PORTAL UNDER THE STARS ...\n\n' +
-'Ssisssuraaaaggg, the immortal demon- snake: Init +0; Atk bite +6 melee; Dmg 1d8; AC 13; HP 20; MV 20’; Act 1d20; SV Fort +8, Ref +4, Will +4; AL L.\n\n' +
-'Pile of living bones (7): Init -2; Atk bite +0 melee; Dmg 1d4-1; AC 8; HP 2; MV 5’; Act 1d20; SV Fort +0, Ref -4, Will +1; AL C.\n\n' +
+'Ssisssuraaaaggg, the immortal demon-snake: Init +0; Atk bite +6 melee; Dmg 1d8; AC 13; HP 20; MV 20’; Act 1d20; SV Fort +8, Ref +4, Will +4; AL L.\n' +
+'The immortal demon-snake guards this scrying chamber. It speaks in a sibilant hiss: “I am Ssisssuraaaaggg, and you intrude on my guardianship.” Then, without parley or hesitation, it attacks.\n' +
+'\n' +
+'Pile of living bones (7): Init -2; Atk bite +0 melee; Dmg 1d4-1; AC 8; HP 2; MV 5’; Act 1d20; SV Fort +0, Ref -4, Will +1; AL C.\n' +
+            '• living dead that have decayed over the eons.\n' +
+            '• shake and rattle as characters approach\n' +
+            '• can no longer animate into cohesive skeletons\n' +
+            '• clack, clatter, and attempt to bite\n' +
+            '• easily avoided and crushed through normal means\n' +
+'\n' +
+'... DAS PORTAL UNTER DEN STERNEN ... \n' +
+'\n' +
+'Kristallstatue (6): INI -2; A Schlag +2 nah (1W4); RK 12; TP 8; BW 3 m; AW 1W20; RW ZÄH -2, REF -2, WIL +0; G N.\n' +
 '\n\n' +
-'... DAS PORTAL UNTER DEN STERNEN ... \n\n' +
-'Kristallstatue (6): INI -2; A Schlag +2 nah (1W4); RK 12; TP 8; BW 3 m; AW 1W20; RW ZÄH -2, REF -2, WIL +0; G N.\n\n' +
-'\n\n' +
-'... One more ... \n\n' +
-'Aua-Monster (2W3): INI +5; A Klaue +7 nah (5W8); RK 23; TP 33; BW fliegen 12 m; AW 3W20; RW ZÄH +1, REF +2, WIL +3; G C.\n\n' +
-'\n\n' +
-'\n\n' +
+'... One more ... \n' +
+'\n' +
+'Aua-Monster (2W3): INI +5; A Klaue +7 nah (5W8); RK 23; TP 33; BW fliegen 12 m; AW 3W20; BES macht "AUA"; RW ZÄH +1, REF +2, WIL +3; G C.\n' +
+'\n' +
+'\n' +
 'DCC RPG, copyright 2012 Goodman Games, System Matters Verlag. All rights reserved.';
   }
 
@@ -684,6 +725,14 @@
       <div class="sp prop">
           <div class="sp label">{{settings.labels.BES}}</div>
           <div class="sp value">{{translateDice monster.sp settings.lang}}</div>
+      </div>
+      {{/if}}
+
+      {{#if monster.descr}}
+      <div class="descr prop">
+        {{#each monster.descr as |d|}}
+          {{d}}<br>
+        {{/each}}
       </div>
       {{/if}}
 
